@@ -173,7 +173,8 @@ schema.pre('remove', true, async function preRemoveGroup (next, done) {
 });
 
 // return a clean object for user.quest
-function _cleanQuestProgress (merge) {
+function _cleanQuestProgress
+ (merge) {
   let clean = {
     key: null,
     progress: {
@@ -737,6 +738,8 @@ schema.methods.sendGroupChatReceivedWebhooks = function sendGroupChatReceivedWeb
 
 schema.statics.cleanQuestProgress = _cleanQuestProgress;
 
+
+//cleanGroupQuest resets progress and collect, as well as members. See line 818 for more.
 // returns a clean object for group.quest
 schema.statics.cleanGroupQuest = function cleanGroupQuest () {
   return {
@@ -813,6 +816,9 @@ schema.methods.finishQuest = async function finishQuest (quest) {
   if (this._id === TAVERN_ID) {
     updates.$set['party.quest.completed'] = questK; // Just show the notif
   } else {
+    //I'm pretty sure the below _cleanQuestProgress is where user.party.quest.progress. up/collectedItems are being reset to zero.
+    //Basically, if this._id is not equal to the tavern id, a Vuex setter is updating the store
+    //with a party quest reset with an object with completed and the quest key as an argument, which would affect all members of the quest and reset the membership.
     updates.$set['party.quest'] = _cleanQuestProgress({completed: questK}); // clear quest progress
   }
 
@@ -873,11 +879,13 @@ schema.methods.finishQuest = async function finishQuest (quest) {
 
   return Bluebird.all(promises);
 };
+//END finishQuest()
 
 function _isOnQuest (user, progress, group) {
   return group && progress && group.quest && group.quest.active && group.quest.members[user._id] === true;
 }
 
+//_processBossQuest may be where boss damage is reset after quest ends.
 schema.methods._processBossQuest = async function processBossQuest (options) {
   let {
     user,
@@ -933,11 +941,13 @@ schema.methods._processBossQuest = async function processBossQuest (options) {
     group.sendChat(`\`You defeated ${quest.boss.name('en')}! Questing party members receive the rewards of victory.\``);
 
     // Participants: Grant rewards & achievements, finish quest
+    //finishQuest() is run before group.save(). finishQuest() uses cleanQuestProgress(), which resets user.party.quest.progress.up and user.party.quest.progress.collectedItems
     await group.finishQuest(shared.content.quests[group.quest.key]);
   }
 
   return await group.save();
 };
+//END bossQuest
 
 schema.methods._processCollectionQuest = async function processCollectionQuest (options) {
   let {
@@ -989,6 +999,7 @@ schema.methods._processCollectionQuest = async function processCollectionQuest (
     return group.quest.progress.collect[k] < v.count;
   })) return await group.save();
 
+  //Also runs finishQuest() which calls cleanQuestProgress() and resets group's progress
   await group.finishQuest(quest);
   group.sendChat('`All items found! Party has received their rewards.`');
 
@@ -1126,7 +1137,7 @@ schema.methods.leave = async function leaveGroup (user, keep = 'keep-all', keepC
     await Bluebird.all(challengesToRemoveUserFrom);
   }
 
-  // Unlink group tasks)
+  // Unlink group tasks
   let assignedTasks = await Tasks.Task.find({
     'group.id': group._id,
     userId: {$exists: false},
