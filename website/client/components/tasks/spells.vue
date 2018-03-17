@@ -247,7 +247,7 @@ export default {
       // Sets userQuest equal to the quest at the index of the quest key. Determines which quest the user is participating in.
       let userQuest = this.quests[user.party.quest.key];
 
-      //If not a user quest, returns 0
+      // If not a user quest, returns 0
       if (!userQuest) {
         return 0;
       }

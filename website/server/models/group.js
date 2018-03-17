@@ -963,7 +963,7 @@ schema.methods._processBossQuest = async function processBossQuest (options) {
       },
       completed: group.quest.key,
     });
-  },
+  }
   return await group.save();
 };
 // END bossQuest
