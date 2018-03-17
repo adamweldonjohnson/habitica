@@ -172,7 +172,7 @@ schema.pre('remove', true, async function preRemoveGroup (next, done) {
   }
 });
 
-// return a clean object for user.quest
+// return a clean object for a new quest
 function _cleanQuestProgress
  (merge) {
   let clean = {
@@ -187,8 +187,11 @@ function _cleanQuestProgress
     RSVPNeeded: false,
   };
 
+  //if a merge is present:
   if (merge) {
+    //merge the 'clean' object, while omitting merge.progress (from the object passed in as an argument)
     _.merge(clean, _.omit(merge, 'progress'));
+    //If merge.progress = true, _.merge clean.progress and merge.progress.
     if (merge.progress) _.merge(clean.progress, merge.progress);
   }
 
@@ -819,7 +822,16 @@ schema.methods.finishQuest = async function finishQuest (quest) {
     //I'm pretty sure the below _cleanQuestProgress is where user.party.quest.progress. up/collectedItems are being reset to zero.
     //Basically, if this._id is not equal to the tavern id, a Vuex setter is updating the store
     //with a party quest reset with an object with completed and the quest key as an argument, which would affect all members of the quest and reset the membership.
-    updates.$set['party.quest'] = _cleanQuestProgress({completed: questK}); // clear quest progress
+
+    //Updated this section of code that the setter is using so that progress.up and progress.collectedItems are sent to the cleanQuestProgress function. This should store the progress and then reset
+    updates.$set['party.quest'] = _cleanQuestProgress({
+      completed: questK,
+      progress: {
+        up,
+        collectedItems,
+      },
+    }); // clear quest progress
+
   }
 
   _.each(_.reject(quest.drop.items, 'onlyOwner'), (item) => {
@@ -941,8 +953,19 @@ schema.methods._processBossQuest = async function processBossQuest (options) {
     group.sendChat(`\`You defeated ${quest.boss.name('en')}! Questing party members receive the rewards of victory.\``);
 
     // Participants: Grant rewards & achievements, finish quest
-    //finishQuest() is run before group.save(). finishQuest() uses cleanQuestProgress(), which resets user.party.quest.progress.up and user.party.quest.progress.collectedItems
-    await group.finishQuest(shared.content.quests[group.quest.key]);
+    // finishQuest() is run before group.save(). finishQuest() uses cleanQuestProgress(), which resets user.party.quest.progress.up and user.party.quest.progress.collectedItems
+    // If finishQuest is passed in progress.up and progress.collectedItems, it should remain through the merge.
+    await group.finishQuest({
+      // shared.content.quests[group.quest.key], --> original code.
+      //Not sure what shared.content.quests is, nor how to access the object in the development environment.
+      //My assumption is that it tracks shared progress for the group (at the index of the quest key), but in the interest of continuity,
+      //I'm choosing to modify the argument to one which passes in progress.up/collectedItems and completed with the quest key.
+      progress: {
+        up,
+        collectedItems
+      },
+      completed: group.quest.key
+    });
   }
 
   return await group.save();
@@ -999,8 +1022,15 @@ schema.methods._processCollectionQuest = async function processCollectionQuest (
     return group.quest.progress.collect[k] < v.count;
   })) return await group.save();
 
-  //Also runs finishQuest() which calls cleanQuestProgress() and resets group's progress
-  await group.finishQuest(quest);
+  //Also runs finishQuest() which calls cleanQuestProgress() and resets group's progress.
+  // Modified this block to pass in the progress.up and progress.collectedItems, as well as completed, which should be merged with clean.
+  await group.finishQuest({
+    progress: {
+      up,
+      collectedItems
+    },
+    completed: group.quest.key
+  });
   group.sendChat('`All items found! Party has received their rewards.`');
 
   return await group.save();
@@ -1059,7 +1089,13 @@ schema.statics.tavernBoss = async function tavernBoss (user, progress) {
 
   if (tavern.quest.progress.hp <= 0) {
     tavern.sendChat(quest.completionChat('en'));
-    await tavern.finishQuest(quest);
+    await tavern.finishQuest({
+      progress: {
+        up,
+        collectedItems
+      },
+      completed: tavern.quest.key
+    });
     _.assign(tavernQuest, {extra: null});
     return tavern.save();
   } else {

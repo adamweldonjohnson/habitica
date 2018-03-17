@@ -226,6 +226,12 @@ function awardLoginIncentives (user) {
 }
 
 // Perform various beginning-of-day reset actions.
+// This is likely where this issue was originating. If a player had completed the quest and "croned out" - or had cronned out causing finishQuest() to run -
+// progress.up and progress.collectedItems were not persisted in finishQuest() from group.js and were reset by the below cron() function.
+// Basically, without persistence from _.merge(), the first user's cron would trigger finishQuest() to run and would
+// eliminate party progress, since it was not being passed in as an argument. 
+// With the modification of arguments passed in to finishQuest(), this cron job will run on the individual
+//user's schedule and reset progress, and would therefore need no modification.
 export function cron (options = {}) {
   let {user, tasksByType, analytics, now = new Date(), daysMissed, timezoneOffsetFromUserPrefs} = options;
   let _progress = {down: 0, up: 0, collectedItems: 0};
