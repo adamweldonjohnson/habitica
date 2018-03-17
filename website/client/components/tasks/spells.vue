@@ -239,12 +239,12 @@ export default {
       return notes;
     },
     questProgress () {
-      //Identifies user
+      // Identifies user
       let user = this.user;
-      //If not a party quest, returns 0
+      // If not a party quest, returns 0
       if (!user.party.quest) return 0;
 
-      //Sets userQuest equal to the quest at the index of the quest key. Determines which quest the user is participating in.
+      // Sets userQuest equal to the quest at the index of the quest key. Determines which quest the user is participating in.
       let userQuest = this.quests[user.party.quest.key];
 
       //If not a user quest, returns 0
@@ -252,17 +252,17 @@ export default {
         return 0;
       }
 
-      //if the userQuest boss = true (there's a boss to fight) and the party progress is greater than 0, returns the current party progress.
+      // If the userQuest boss = true (there's a boss to fight) and the party progress is greater than 0, returns the current party progress.
       if (userQuest.boss && user.party.quest.progress.up > 0) {
         return user.party.quest.progress.up;
       }
 
-      //If userQuest.collect = true (assuming the completion of the quest?) and party progress collected items is greater than 0 (there's something to collect), returns the items collected by the party.
+      // If userQuest.collect = true (assuming the completion of the quest?) and party progress collected items is greater than 0 (there's something to collect), returns the items collected by the party.
       if (userQuest.collect && user.party.quest.progress.collectedItems > 0) {
         return user.party.quest.progress.collectedItems;
       }
 
-      //Returns 0 if all other conditions are unmet.
+      // Returns 0 if all other conditions are unmet.
       return 0;
     },
     // @TODO: Move to mouse move component??

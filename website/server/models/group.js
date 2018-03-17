@@ -173,8 +173,7 @@ schema.pre('remove', true, async function preRemoveGroup (next, done) {
 });
 
 // return a clean object for a new quest
-function _cleanQuestProgress
- (merge) {
+function _cleanQuestProgress(merge) {
   let clean = {
     key: null,
     progress: {
@@ -187,11 +186,11 @@ function _cleanQuestProgress
     RSVPNeeded: false,
   };
 
-  //if a merge is present:
+  // If a merge is present:
   if (merge) {
-    //merge the 'clean' object, while omitting merge.progress (from the object passed in as an argument)
+    // Merge the 'clean' object, while omitting merge.progress (from the object passed in as an argument)
     _.merge(clean, _.omit(merge, 'progress'));
-    //If merge.progress = true, _.merge clean.progress and merge.progress.
+    // If merge.progress = true, _.merge clean.progress and merge.progress.
     if (merge.progress) _.merge(clean.progress, merge.progress);
   }
 
@@ -742,7 +741,7 @@ schema.methods.sendGroupChatReceivedWebhooks = function sendGroupChatReceivedWeb
 schema.statics.cleanQuestProgress = _cleanQuestProgress;
 
 
-//cleanGroupQuest resets progress and collect, as well as members. See line 818 for more.
+// cleanGroupQuest resets progress and collect, as well as members. See line 818 for more.
 // returns a clean object for group.quest
 schema.statics.cleanGroupQuest = function cleanGroupQuest () {
   return {
@@ -819,22 +818,20 @@ schema.methods.finishQuest = async function finishQuest (quest) {
   if (this._id === TAVERN_ID) {
     updates.$set['party.quest.completed'] = questK; // Just show the notif
   } else {
-    //I'm pretty sure the below _cleanQuestProgress is where user.party.quest.progress. up/collectedItems are being reset to zero.
-    //Basically, if this._id is not equal to the tavern id, a Vuex setter is updating the store
-    //with a party quest reset with an object with completed and the quest key as an argument, which would affect all members of the quest and reset the membership.
+    // I'm pretty sure the below _cleanQuestProgress is where user.party.quest.progress. up/collectedItems are being reset to zero.
+    // Basically, if this._id is not equal to the tavern id, a Vuex setter is updating the store
+    // with a party quest reset with an object with completed and the quest key as an argument, which would affect all members of the quest and reset the membership.
 
-    //Updated this section of code that the setter is using so that progress.up and progress.collectedItems are sent to the cleanQuestProgress function. This should store the progress and then reset
+    // Updated this section of code that the setter is using so that progress.up and progress.collectedItems are sent to the cleanQuestProgress function. This should store the progress and then reset
     updates.$set['party.quest'] = _cleanQuestProgress({
       completed: questK,
       progress: {
-        up,
-        collectedItems,
+        up: party.quest.progress.up,
+        collectedItems: party.quest.progress.collectedItems,
       },
     }); // clear quest progress
-
   }
-
-  _.each(_.reject(quest.drop.items, 'onlyOwner'), (item) => {
+  _.each(_.reject(quest.drop.items, 'onlyOwner'), (item) =>{
     _.merge(updates, _getUserUpdateForQuestReward(item, quest.drop.items));
   });
 
@@ -891,13 +888,13 @@ schema.methods.finishQuest = async function finishQuest (quest) {
 
   return Bluebird.all(promises);
 };
-//END finishQuest()
+// END finishQuest()
 
 function _isOnQuest (user, progress, group) {
   return group && progress && group.quest && group.quest.active && group.quest.members[user._id] === true;
 }
 
-//_processBossQuest may be where boss damage is reset after quest ends.
+// _processBossQuest may be where boss damage is reset after quest ends.
 schema.methods._processBossQuest = async function processBossQuest (options) {
   let {
     user,
@@ -961,16 +958,15 @@ schema.methods._processBossQuest = async function processBossQuest (options) {
       //My assumption is that it tracks shared progress for the group (at the index of the quest key), but in the interest of continuity,
       //I'm choosing to modify the argument to one which passes in progress.up/collectedItems and completed with the quest key.
       progress: {
-        up,
-        collectedItems
+        up: group.quest.progress.up,
+        collectedItems: group.quest.progress.collectedItems
       },
-      completed: group.quest.key
+      completed: group.quest.key,
     });
-  }
-
+  },
   return await group.save();
 };
-//END bossQuest
+// END bossQuest
 
 schema.methods._processCollectionQuest = async function processCollectionQuest (options) {
   let {
@@ -1026,8 +1022,8 @@ schema.methods._processCollectionQuest = async function processCollectionQuest (
   // Modified this block to pass in the progress.up and progress.collectedItems, as well as completed, which should be merged with clean.
   await group.finishQuest({
     progress: {
-      up,
-      collectedItems
+      up: group.quest.progress.up,
+      collectedItems: group.quest.progress.collectedItems
     },
     completed: group.quest.key
   });
@@ -1091,8 +1087,8 @@ schema.statics.tavernBoss = async function tavernBoss (user, progress) {
     tavern.sendChat(quest.completionChat('en'));
     await tavern.finishQuest({
       progress: {
-        up,
-        collectedItems
+        up: tavern.quest.progress.up,
+        collectedItems: tavern.quest.progress.collectedItems
       },
       completed: tavern.quest.key
     });
