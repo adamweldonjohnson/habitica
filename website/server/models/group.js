@@ -173,7 +173,7 @@ schema.pre('remove', true, async function preRemoveGroup (next, done) {
 });
 
 // return a clean object for a new quest
-function _cleanQuestProgress(merge) {
+function _cleanQuestProgress (merge) {
   let clean = {
     key: null,
     progress: {
@@ -806,6 +806,8 @@ async function _updateUserWithRetries (userId, updates, numTry = 1, query = {}) 
 // Changes the group object update members
 schema.methods.finishQuest = async function finishQuest (quest) {
   let questK = quest.key;
+  let completed = quest.completed;
+  let questProgress = quest.progress;
   let updates = {
     $inc: {
       [`achievements.quests.${questK}`]: 1,
@@ -815,7 +817,7 @@ schema.methods.finishQuest = async function finishQuest (quest) {
     $set: {},
   };
 
-  if (this._id === TAVERN_ID) {
+  if (this._id === TAVERN_ID || completed) {
     updates.$set['party.quest.completed'] = questK; // Just show the notif
   } else {
     // I'm pretty sure the below _cleanQuestProgress is where user.party.quest.progress. up/collectedItems are being reset to zero.
@@ -824,14 +826,11 @@ schema.methods.finishQuest = async function finishQuest (quest) {
 
     // Updated this section of code that the setter is using so that progress.up and progress.collectedItems are sent to the cleanQuestProgress function. This should store the progress and then reset
     updates.$set['party.quest'] = _cleanQuestProgress({
-      completed: questK,
-      progress: {
-        up: party.quest.progress.up,
-        collectedItems: party.quest.progress.collectedItems,
-      },
+      key: questK,
+      progress: questProgress,
     }); // clear quest progress
   }
-  _.each(_.reject(quest.drop.items, 'onlyOwner'), (item) =>{
+  _.each(_.reject(quest.drop.items, 'onlyOwner'), (item) => {
     _.merge(updates, _getUserUpdateForQuestReward(item, quest.drop.items));
   });
 
@@ -954,13 +953,11 @@ schema.methods._processBossQuest = async function processBossQuest (options) {
     // If finishQuest is passed in progress.up and progress.collectedItems, it should remain through the merge.
     await group.finishQuest({
       // shared.content.quests[group.quest.key], --> original code.
-      //Not sure what shared.content.quests is, nor how to access the object in the development environment.
-      //My assumption is that it tracks shared progress for the group (at the index of the quest key), but in the interest of continuity,
-      //I'm choosing to modify the argument to one which passes in progress.up/collectedItems and completed with the quest key.
-      progress: {
-        up: group.quest.progress.up,
-        collectedItems: group.quest.progress.collectedItems
-      },
+      // Not sure what shared.content.quests is, nor how to access the object in the development environment.
+      // My assumption is that it tracks shared progress for the group (at the index of the quest key), but in the interest of continuity,
+      // I'm choosing to modify the argument to one which passes in progress.up/collectedItems and completed with the quest key.
+      key: group.quest.key,
+      progress: group.quest.progress,
       completed: group.quest.key,
     });
   }
@@ -1018,14 +1015,12 @@ schema.methods._processCollectionQuest = async function processCollectionQuest (
     return group.quest.progress.collect[k] < v.count;
   })) return await group.save();
 
-  //Also runs finishQuest() which calls cleanQuestProgress() and resets group's progress.
+  // Also runs finishQuest() which calls cleanQuestProgress() and resets group's progress.
   // Modified this block to pass in the progress.up and progress.collectedItems, as well as completed, which should be merged with clean.
   await group.finishQuest({
-    progress: {
-      up: group.quest.progress.up,
-      collectedItems: group.quest.progress.collectedItems
-    },
-    completed: group.quest.key
+    key: group.quest.key,
+    progress: group.quest.progress,
+    completed: group.quest.key,
   });
   group.sendChat('`All items found! Party has received their rewards.`');
 
@@ -1086,11 +1081,9 @@ schema.statics.tavernBoss = async function tavernBoss (user, progress) {
   if (tavern.quest.progress.hp <= 0) {
     tavern.sendChat(quest.completionChat('en'));
     await tavern.finishQuest({
-      progress: {
-        up: tavern.quest.progress.up,
-        collectedItems: tavern.quest.progress.collectedItems
-      },
-      completed: tavern.quest.key
+      key: tavern.quest.key,
+      progress: tavern.quest.progress,
+      completed: tavern.quest.key,
     });
     _.assign(tavernQuest, {extra: null});
     return tavern.save();
