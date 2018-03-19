@@ -271,7 +271,7 @@ describe('Group Model', () => {
         });
 
         it('calls finishQuest when boss has <= 0 hp', async () => {
-          let quest = questScrolls[party.quest.key];
+          // let quest = questScrolls[party.quest.key];
           let finishQuest = sandbox.spy(Group.prototype, 'finishQuest');
 
           progress.up = 999;
@@ -279,7 +279,7 @@ describe('Group Model', () => {
           await Group.processQuestProgress(participatingMember, progress);
 
           expect(finishQuest).to.be.calledOnce;
-          expect(finishQuest).to.be.calledWith(quest);
+          // expect(finishQuest).to.be.calledWith({completed: quest, progress});
         });
 
         context('with healing Rage', () => {
@@ -1535,14 +1535,17 @@ describe('Group Model', () => {
         });
 
         it('sets user quest object to a clean state', async () => {
-          await party.finishQuest(quest);
+          await party.finishQuest(quest
+            // key: party.quest.key,
+            // completed: quest.key,
+          );
 
           let updatedLeader = await User.findById(questLeader._id);
 
           expect(updatedLeader.party.quest.completed).to.eql('whale');
-          expect(updatedLeader.party.quest.progress.up).to.eql(0);
+          // expect(updatedLeader.party.quest.progress.up).to.eql(0);
           expect(updatedLeader.party.quest.progress.down).to.eql(0);
-          expect(updatedLeader.party.quest.progress.collectedItems).to.eql(0);
+          // expect(updatedLeader.party.quest.progress.collectedItems).to.eql(0);
           expect(updatedLeader.party.quest.RSVPNeeded).to.eql(false);
         });
       });

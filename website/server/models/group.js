@@ -174,27 +174,61 @@ schema.pre('remove', true, async function preRemoveGroup (next, done) {
 
 // return a clean object for a new quest
 function _cleanQuestProgress (merge) {
-  let clean = {
-    key: null,
-    progress: {
-      up: 0,
-      down: 0,
-      collect: {},
-      collectedItems: 0,
-    },
-    completed: null,
-    RSVPNeeded: false,
-  };
+  // let clean = {
+  //   key: null,
+  //   progress: {
+  //     // up: 0,
+  //     down: 0,
+  //     collect: {},
+  //     // collectedItems: 0,
+  //   },
+  //   completed: null,
+  //   RSVPNeeded: false,
+  // };
 
   // If a merge is present:
   if (merge) {
-    // Merge the 'clean' object, while omitting merge.progress (from the object passed in as an argument)
-    _.merge(clean, _.omit(merge, 'progress'));
+    let clean = {
+      key: null,
+      progress: {
+        up: merge.progress.up,
+        down: 0,
+        collect: {},
+        collectedItems: merge.progress.collectedItems,
+      },
+      completed: merge.completed,
+      RSVPNeeded: false,
+    };
+
+    return clean;
+    // _.merge(clean, _.omit(merge, 'progress'));
     // If merge.progress = true, _.merge clean.progress and merge.progress.
-    if (merge.progress) _.merge(clean.progress, merge.progress);
+    // if (merge.progress) _.merge(clean.progress, merge.progress);
+    // if (merge.progress) {
+    //   let clean.progress = {
+    //     up: merge.progress.up,
+    //     down: 0,
+    //     collect: {},
+    //     collectedItems: merge.progress.collectedItems,
+    //   };
+    // }
+  } else {
+    let clean = {
+      key: null,
+      progress: {
+        up: 0,
+        down: 0,
+        collect: {},
+        collectedItems: {},
+      },
+      completed: null,
+      RSVPNeeded: false,
+    };
+
+    return clean;
   }
 
-  return clean;
+  // return clean; // Maintains progress.up and progress.collectedItems until player goes through cron.
 }
 
 schema.statics.getGroup = async function getGroup (options = {}) {
@@ -741,7 +775,7 @@ schema.methods.sendGroupChatReceivedWebhooks = function sendGroupChatReceivedWeb
 schema.statics.cleanQuestProgress = _cleanQuestProgress;
 
 
-// cleanGroupQuest resets progress and collect, as well as members. See line 818 for more.
+// cleanGroupQuest resets progress and collect, as well as members. This doesn't seem to be used anywhere else in the document.
 // returns a clean object for group.quest
 schema.statics.cleanGroupQuest = function cleanGroupQuest () {
   return {
@@ -806,8 +840,8 @@ async function _updateUserWithRetries (userId, updates, numTry = 1, query = {}) 
 // Changes the group object update members
 schema.methods.finishQuest = async function finishQuest (quest) {
   let questK = quest.key;
-  let completed = quest.completed;
-  let questProgress = quest.progress;
+  // let completed = quest.completed;
+  // let questProgress = quest.progress;
   let updates = {
     $inc: {
       [`achievements.quests.${questK}`]: 1,
@@ -817,17 +851,16 @@ schema.methods.finishQuest = async function finishQuest (quest) {
     $set: {},
   };
 
-  if (this._id === TAVERN_ID || completed) {
+  if (this._id === TAVERN_ID) {
     updates.$set['party.quest.completed'] = questK; // Just show the notif
   } else {
     // I'm pretty sure the below _cleanQuestProgress is where user.party.quest.progress. up/collectedItems are being reset to zero.
     // Basically, if this._id is not equal to the tavern id, a Vuex setter is updating the store
     // with a party quest reset with an object with completed and the quest key as an argument, which would affect all members of the quest and reset the membership.
-
-    // Updated this section of code that the setter is using so that progress.up and progress.collectedItems are sent to the cleanQuestProgress function. This should store the progress and then reset
+    // Ignore the above. That's the set function from MongoDB.
     updates.$set['party.quest'] = _cleanQuestProgress({
-      key: questK,
-      progress: questProgress,
+      progress: this.quest.progress,
+      completed: this.quest.key,
     }); // clear quest progress
   }
   _.each(_.reject(quest.drop.items, 'onlyOwner'), (item) => {
@@ -893,7 +926,6 @@ function _isOnQuest (user, progress, group) {
   return group && progress && group.quest && group.quest.active && group.quest.members[user._id] === true;
 }
 
-// _processBossQuest may be where boss damage is reset after quest ends.
 schema.methods._processBossQuest = async function processBossQuest (options) {
   let {
     user,
@@ -951,15 +983,30 @@ schema.methods._processBossQuest = async function processBossQuest (options) {
     // Participants: Grant rewards & achievements, finish quest
     // finishQuest() is run before group.save(). finishQuest() uses cleanQuestProgress(), which resets user.party.quest.progress.up and user.party.quest.progress.collectedItems
     // If finishQuest is passed in progress.up and progress.collectedItems, it should remain through the merge.
-    await group.finishQuest({
-      // shared.content.quests[group.quest.key], --> original code.
+    // let questProgress = group.quest.progress;
+    // // NOTE: IF 'QUEST' IS PASSED IN, ALL TESTS PASS.
+    await group.finishQuest(quest
+      // completed: quest,
+      // progress: this.options.progress,
+      // group.quest
+      // progress: this.options.progress,
+      // completed: group.quest.key,
+      // progress: this.options.progress,
+      // completed: quest.key,
+      // key: this.group.quest.key,
+      // progress: this.options.progress,
+      // key: group.quest.key,
+      // progress: options.progress,
+      // key: this.quest.key,
+      // progress: this.quest.progress,
+      // this.quest
+      // key: quest.key,
+      // progress: quest.progress,
+    // }
+      // shared.content.quests[group.quest.key],
       // Not sure what shared.content.quests is, nor how to access the object in the development environment.
-      // My assumption is that it tracks shared progress for the group (at the index of the quest key), but in the interest of continuity,
-      // I'm choosing to modify the argument to one which passes in progress.up/collectedItems and completed with the quest key.
-      key: group.quest.key,
-      progress: group.quest.progress,
-      completed: group.quest.key,
-    });
+      // My assumption is that it tracks shared progress for the group (at the index of the quest key)
+    );
   }
   return await group.save();
 };
@@ -1015,13 +1062,8 @@ schema.methods._processCollectionQuest = async function processCollectionQuest (
     return group.quest.progress.collect[k] < v.count;
   })) return await group.save();
 
-  // Also runs finishQuest() which calls cleanQuestProgress() and resets group's progress.
-  // Modified this block to pass in the progress.up and progress.collectedItems, as well as completed, which should be merged with clean.
-  await group.finishQuest({
-    key: group.quest.key,
-    progress: group.quest.progress,
-    completed: group.quest.key,
-  });
+  // Needs return a clean quest, per Alys on #3963
+  await group.finishQuest(quest);
   group.sendChat('`All items found! Party has received their rewards.`');
 
   return await group.save();
@@ -1080,11 +1122,11 @@ schema.statics.tavernBoss = async function tavernBoss (user, progress) {
 
   if (tavern.quest.progress.hp <= 0) {
     tavern.sendChat(quest.completionChat('en'));
-    await tavern.finishQuest({
-      key: tavern.quest.key,
-      progress: tavern.quest.progress,
-      completed: tavern.quest.key,
-    });
+    // await tavern.finishQuest({
+    // quest,
+    // key: quest.key,
+    // progress: tavern.quest.progress,
+    // });
     _.assign(tavernQuest, {extra: null});
     return tavern.save();
   } else {
